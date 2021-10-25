@@ -14,6 +14,12 @@ build:
 	@echo 'Building app...'
 	npm run build
 
+## run: run the application
+.PHONY: run
+run:
+	@echo 'Running app...'
+	npm start
+
 ## format: format the application
 .PHONY: format
 format:

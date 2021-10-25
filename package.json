@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "start": "node build/index.js",
     "format": "prettier --write ./src"
   },
   "author": "",
@@ -13,5 +14,8 @@
     "@types/node": "^16.11.4",
     "prettier": "^2.4.1",
     "typescript": "^4.4.4"
+  },
+  "dependencies": {
+    "got": "^11.8.2"
   }
 }
