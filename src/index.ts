@@ -1,5 +1,6 @@
 import { bufferToLocations } from "./convert";
 import { isCoordInBox } from "./coordinate";
+import { getFlightDetails } from "./details";
 import { getBinaryFlightData } from "./position";
 
 async function main() {
@@ -10,7 +11,7 @@ async function main() {
   }
 
   const locations = bufferToLocations(arr);
-  const result = locations.filter((aircraftData) => {
+  const result = locations.find((aircraftData) => {
     return isCoordInBox(
       [
         { long: -93.357824, lat: 44.934261 },
@@ -19,7 +20,14 @@ async function main() {
       aircraftData.location
     );
   });
-  console.log(JSON.stringify(result, null, 2));
+
+  if (!result?.flight) {
+    console.log("No flights in area. Skipping details lookup.");
+    return;
+  }
+
+  const info = await getFlightDetails(result.flight);
+  console.log(info);
 }
 
 main();
