@@ -5,6 +5,8 @@ const GLOBE_RATES_URL = `${API_BASE}/globeRates.json`;
 const BIN_URL = `${API_BASE}/data/globe_6352.binCraft`;
 
 export async function getBinaryFlightData(): Promise<ArrayBuffer | null> {
+  // TODO: Be smart about connections and cookies
+  // We don't want a new cookie for every request
   const cookie = generateCookie();
   try {
     await getRates(cookie);
