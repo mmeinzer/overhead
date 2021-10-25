@@ -1,0 +1,17 @@
+{
+  "name": "overhead",
+  "version": "1.0.0",
+  "description": "See what flight is overhead",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "format": "prettier --write ./src"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^16.11.4",
+    "prettier": "^2.4.1",
+    "typescript": "^4.4.4"
+  }
+}
