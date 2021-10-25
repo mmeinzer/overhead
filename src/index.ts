@@ -1,5 +1,5 @@
 import { bufferToLocations } from "./convert";
-import { inBox } from "./coordinate";
+import { isCoordInBox } from "./coordinate";
 import { getBinaryFlightData } from "./position";
 
 async function main() {
@@ -11,7 +11,7 @@ async function main() {
 
   const locations = bufferToLocations(arr);
   const result = locations.filter((aircraftData) => {
-    return inBox(
+    return isCoordInBox(
       [
         { long: -93.357824, lat: 44.934261 },
         { long: -93.345335, lat: 44.940246 },

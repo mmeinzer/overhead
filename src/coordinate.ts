@@ -3,7 +3,7 @@ export type Coordinate = {
   long: number;
 };
 
-export function inBox(
+export function isCoordInBox(
   box: [Coordinate, Coordinate],
   point: Coordinate
 ): boolean {
