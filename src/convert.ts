@@ -1,6 +1,6 @@
 import { Coordinate } from "./coordinate";
 
-type Aircraft = {
+export type Aircraft = {
   location: Coordinate;
   registration: string | null; // r
   flight: string | null;

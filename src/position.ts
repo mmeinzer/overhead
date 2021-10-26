@@ -1,64 +1,128 @@
-import got, { Response } from "got";
+import got, { Got, Response } from "got";
+import { EventEmitter } from "stream";
+import { bufferToLocations, Aircraft } from "./convert";
 
-const API_BASE = "https://globe.adsbexchange.com";
-const GLOBE_RATES_URL = `${API_BASE}/globeRates.json`;
-const BIN_URL = `${API_BASE}/data/globe_6352.binCraft`;
+export class PositionUpdater {
+  static readonly #API_BASE = "https://globe.adsbexchange.com";
+  static readonly #GLOBAL_RATES_ENDPOINT = `globeRates.json`;
+  static readonly #POSITIONS_BIN_ENDPOINT = `data/globe_6352.binCraft`;
+  static readonly #COOKIE_NAME = "adsbx_sid";
 
-export async function getBinaryFlightData(): Promise<ArrayBuffer | null> {
-  // TODO: Be smart about connections and cookies
-  // We don't want a new cookie for every request
-  const cookie = generateCookie();
-  try {
-    await getRates(cookie);
-  } catch (err) {
-    console.error("Failed to get rates!");
-    return null;
-  }
+  readonly #client: Got;
+  readonly #emitter = new EventEmitter();
+  readonly #UPDATE_EVENT = Symbol("updateEvent");
 
-  let res: Response<Buffer>;
-  try {
-    res = await got(BIN_URL, {
+  #cookie: string;
+  #returnedRateLimitMs: number = 2000;
+  #intervalId: NodeJS.Timer | null = null;
+  #airplanes: Aircraft[] = [];
+
+  constructor() {
+    this.#cookie = PositionUpdater.generateCookie();
+    this.#client = got.extend({
+      prefixUrl: PositionUpdater.#API_BASE,
       headers: {
-        referer: `${API_BASE}/`,
-        cookie,
+        referer: `${PositionUpdater.#API_BASE}/`,
+        cookie: this.#cookie,
       },
       retry: 0,
-      responseType: "buffer",
     });
-  } catch (err) {
-    console.log(err);
-    return null;
   }
 
-  const { body } = res;
-  const arrayBuffer = body.buffer.slice(
-    body.byteOffset,
-    body.byteOffset + body.byteLength
-  );
+  async start(): Promise<void> {
+    const rateLimit = await this.activateCookieViaRateLimitEndpoint();
+    if (rateLimit === null) {
+      console.error("Failed to activate cookie");
+      return;
+    }
 
-  return arrayBuffer;
-}
+    this.#intervalId = setInterval(
+      this.updateFlightData.bind(this),
+      this.#returnedRateLimitMs
+    );
+  }
 
-const COOKIE_NAME = "adsbx_sid";
+  stop(): void {
+    if (!this.#intervalId) {
+      return;
+    }
 
-function generateCookie(): string {
-  const ts = new Date().getTime();
-  const cookieVal =
-    ts + 2 * 86400 * 1000 + "_" + Math.random().toString(36).substring(2, 15);
-  return `${COOKIE_NAME}=${cookieVal}`;
-}
+    clearInterval(this.#intervalId);
+    this.#intervalId = null;
 
-function getRates(cookie: string): Promise<RatesResponse> {
-  return got(GLOBE_RATES_URL, {
-    headers: {
-      referer: `${API_BASE}/`,
-      cookie,
-    },
-    retry: 0,
-  }).json();
+    this.#emitter.removeAllListeners();
+  }
+
+  onUpdate(cb: AircraftUpdateHandler): void {
+    this.#emitter.on(this.#UPDATE_EVENT, cb);
+  }
+
+  // This method is directly from the ADS-B exchange JS
+  private static generateCookie(): string {
+    const randomBytes = Math.random().toString(36).substring(2, 15);
+
+    const timeNowMs = new Date().getTime();
+    const twoDaysMs = 2 * 86400 * 1000; // Two days in ms
+    const expiresAtMs = timeNowMs + twoDaysMs;
+
+    const cookieVal = `${expiresAtMs}_${randomBytes}`;
+
+    return `${PositionUpdater.#COOKIE_NAME}=${cookieVal}`;
+  }
+
+  private async activateCookieViaRateLimitEndpoint(): Promise<number | null> {
+    try {
+      const rates: RatesResponse = await this.#client
+        .get(PositionUpdater.#GLOBAL_RATES_ENDPOINT)
+        .json();
+
+      console.log(`Got rate limit: ${rates.refresh}ms`);
+      this.#returnedRateLimitMs = rates.refresh;
+      return rates.refresh;
+    } catch (err) {
+      console.error(err);
+
+      return null;
+    }
+  }
+
+  private async getBinaryFlightData(): Promise<ArrayBuffer | null> {
+    let res: Response<Buffer>;
+    try {
+      res = await this.#client.get(PositionUpdater.#POSITIONS_BIN_ENDPOINT, {
+        responseType: "buffer",
+      });
+    } catch (err) {
+      console.error(err);
+
+      return null;
+    }
+
+    const { body } = res;
+    const arrayBuffer = body.buffer.slice(
+      body.byteOffset,
+      body.byteOffset + body.byteLength
+    );
+
+    return arrayBuffer;
+  }
+
+  private async updateFlightData(): Promise<void> {
+    const data = await this.getBinaryFlightData();
+    if (!data) {
+      // TODO: reset the cookie here or something?
+      console.error("Failed to get binary data");
+      return;
+    }
+
+    this.#airplanes = bufferToLocations(data);
+    this.#emitter.emit(this.#UPDATE_EVENT, this.#airplanes);
+  }
 }
 
 type RatesResponse = {
   simload: number;
   refresh: number; // ms refresh rate
 };
+
+type AircraftUpdateHandler = (aircraft: Aircraft[]) => void;

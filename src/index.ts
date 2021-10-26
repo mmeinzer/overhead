@@ -1,16 +1,16 @@
-import { bufferToLocations } from "./convert";
+import { Aircraft } from "./convert";
 import { isCoordInBox } from "./coordinate";
 import { getFlightDetails } from "./details";
-import { getBinaryFlightData } from "./position";
+import { PositionUpdater } from "./position";
 
 async function main() {
-  const arr = await getBinaryFlightData();
-  if (!arr) {
-    console.error("Failed to fetch data");
-    return;
-  }
+  const updater = new PositionUpdater();
+  updater.onUpdate(logIfAnyInBox);
 
-  const locations = bufferToLocations(arr);
+  await updater.start();
+}
+
+async function logIfAnyInBox(locations: Aircraft[]): Promise<void> {
   const result = locations.find((aircraftData) => {
     return isCoordInBox(
       [
@@ -27,6 +27,7 @@ async function main() {
   }
 
   const info = await getFlightDetails(result.flight);
+
   console.log(info);
 }
 
