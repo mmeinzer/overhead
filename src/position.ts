@@ -76,7 +76,6 @@ export class PositionUpdater {
         .get(PositionUpdater.#GLOBAL_RATES_ENDPOINT)
         .json();
 
-      console.log(`Got rate limit: ${rates.refresh}ms`);
       this.#returnedRateLimitMs = rates.refresh;
       return rates.refresh;
     } catch (err) {
