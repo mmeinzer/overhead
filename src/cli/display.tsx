@@ -11,10 +11,14 @@ const vergeBox: [Coordinate, Coordinate] = [
 
 function Counter() {
   const [airplanes, setAirplanes] = useState<Aircraft[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
 
   useEffect(() => {
     const updater = new PositionUpdater();
-    updater.onUpdate((airplanes) => setAirplanes(airplanes));
+    updater.onUpdate((airplanes) => {
+      setAirplanes(airplanes);
+      setUpdatedAt(new Date());
+    });
     updater.start();
   }, []);
 
@@ -22,18 +26,22 @@ function Counter() {
     <>
       <Box flexDirection="column">
         {airplanes.length === 0 ? <Text color="green">Loading...</Text> : null}
+        <Text>{updatedAt.toLocaleString()}</Text>
         {airplanes
           .filter(({ flight, registration }) => flight || registration)
-          .map((airplane) => (
-            <Text
-              key={airplane.flight ?? airplane.registration}
-              color={
-                isCoordInBox(vergeBox, airplane.location) ? "blue" : "white"
-              }
-            >
-              {airplane.flight}
-            </Text>
-          ))}
+          .map((airplane) => {
+            const { flight, registration } = airplane;
+            const inBox = isCoordInBox(vergeBox, airplane.location);
+
+            return (
+              <Text
+                key={flight ?? registration}
+                color={inBox ? "blue" : "white"}
+              >
+                {`${flight ?? registration} ${inBox ? "✈️" : ""}`}
+              </Text>
+            );
+          })}
       </Box>
     </>
   );
