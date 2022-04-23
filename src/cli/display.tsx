@@ -9,6 +9,10 @@ const vergeBox: [Coordinate, Coordinate] = [
   { long: -93.333, lat: 44.939 },
 ];
 
+const nNumberRegex = RegExp(
+  /^N[1-9]((\d{0,4})|(\d{0,3}[A-HJ-NP-Z])|(\d{0,2}[A-HJ-NP-Z]{2}))$/
+);
+
 function Counter() {
   const [airplanes, setAirplanes] = useState<Aircraft[]>([]);
   const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
@@ -28,17 +32,17 @@ function Counter() {
         {airplanes.length === 0 ? <Text color="green">Loading...</Text> : null}
         <Text>{updatedAt.toLocaleString()}</Text>
         {airplanes
-          .filter(({ flight, registration }) => flight || registration)
+          .filter(({ flight }) => {
+            return flight && flight.trim() && !nNumberRegex.test(flight.trim());
+          })
           .map((airplane) => {
-            const { flight, registration } = airplane;
+            const { flight } = airplane;
             const inBox = isCoordInBox(vergeBox, airplane.location);
+            const trimmedFlight = flight!.trim(); // exists because of filter
 
             return (
-              <Text
-                key={flight ?? registration}
-                color={inBox ? "blue" : "white"}
-              >
-                {`${flight ?? registration} ${inBox ? "✈️" : ""}`}
+              <Text key={trimmedFlight} color={inBox ? "blue" : "white"}>
+                {`${trimmedFlight} ${inBox ? "✈️" : ""}`}
               </Text>
             );
           })}
