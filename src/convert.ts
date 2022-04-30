@@ -32,23 +32,17 @@ export function bufferToLocations(buffer: ArrayBuffer): Aircraft[] {
 
     for (let i = 92; u8[i] && i < 104; i++) {
       aircraft.registration += String.fromCharCode(u8[i]!);
-    }
-    if (aircraft.registration === "") {
-      aircraft.registration = null;
+      aircraft.registration = aircraft.registration?.trim() || null;
     }
 
     for (let i = 78; u8[i] && i < 86; i++) {
       aircraft.flight += String.fromCharCode(u8[i]!);
-    }
-    if (aircraft.flight === "") {
-      aircraft.flight = null;
+      aircraft.flight = aircraft.flight?.trim() || null;
     }
 
     for (let i = 88; u8[i] && i < 92; i++) {
       aircraft.type += String.fromCharCode(u8[i]!);
-    }
-    if (aircraft.type === "") {
-      aircraft.type = null;
+      aircraft.type = aircraft.type?.trim() || null;
     }
 
     aircrafts.push(aircraft);
