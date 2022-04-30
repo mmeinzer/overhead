@@ -1,7 +1,4 @@
-import got from "got";
-
-const DETAILS_API_BASE = "https://aeroapi.flightaware.com";
-const FLIGHT_ENDPOINT = "/aeroapi/flights/";
+import got, { Got } from "got";
 
 type Res = {
   flights?: FullFlightInfo[];
@@ -12,32 +9,113 @@ type Flight = {
   destination: string;
 };
 
-export async function getFlightDetails(ident: string): Promise<Flight | null> {
-  const url = `${DETAILS_API_BASE}${FLIGHT_ENDPOINT}${ident}`;
+type CacheRecord = {
+  flight: Flight | null;
+  addedAt: number;
+};
 
-  try {
-    const res: Res = await got(url, {
+export class DetailsAPI {
+  static readonly #API_BASE = "https://aeroapi.flightaware.com";
+  static readonly #FLIGHT_ENDPOINT = "aeroapi/flights/";
+  static readonly #CACHE_RECORD_TTL_MINS = 1;
+
+  readonly #client: Got;
+  readonly #cache: Map<string, CacheRecord>;
+
+  constructor() {
+    this.#client = got.extend({
+      prefixUrl: DetailsAPI.#API_BASE,
       headers: {
         "x-apikey": process.env.FLIGHT_AWARE_API_KEY,
       },
       retry: 0,
-    }).json();
+    });
+
+    this.#cache = new Map();
+
+    setInterval(this.cacheRemoveExpired.bind(this), 1000);
+  }
+
+  async lookup(ident: string): Promise<Flight | null> {
+    const cachedFlight = this.cacheGet(ident);
+    if (cachedFlight !== undefined) {
+      return cachedFlight;
+    }
+
+    try {
+      const details = await this.getFlightDetails(ident);
+      this.cacheSet(ident, details);
+      return details;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Error in looking up flight details");
+    }
+  }
+
+  private async getFlightDetails(ident: string): Promise<Flight | null> {
+    const endpoint = `${DetailsAPI.#FLIGHT_ENDPOINT}${ident}`;
+
+    const res: Res = await this.#client
+      .get(endpoint, {
+        headers: {
+          "x-apikey": process.env.FLIGHT_AWARE_API_KEY,
+        },
+        retry: 0,
+      })
+      .json();
 
     const inProgressFlights =
       res.flights?.filter(
         (flight) => flight.progress_percent > 0 && flight.progress_percent < 100
       ) ?? [];
 
-    const first = inProgressFlights[0];
+    const [first] = inProgressFlights;
     if (!first) {
       console.warn("No in progress flights found");
       return null;
     }
 
     return { origin: first.origin.code, destination: first.destination.code };
-  } catch (err) {
-    console.error(err);
-    throw new Error("Error getting flight details");
+  }
+
+  // Cache methods
+
+  /**
+   * Returns undefined in the event of a cache miss. Otherwise null or Flight depending
+   * on what the API returned.
+   */
+  private cacheGet(ident: string): Flight | null | undefined {
+    const cacheRecord = this.#cache.get(ident);
+    if (cacheRecord === undefined) {
+      console.log(`${ident} cache miss`);
+      return undefined;
+    }
+
+    if (this.expired(cacheRecord.addedAt)) {
+      console.log(`${ident} cache hit but expired`);
+      return undefined;
+    }
+
+    console.log(`${ident} cache hit`);
+    return cacheRecord.flight;
+  }
+
+  private cacheSet(ident: string, flight: Flight | null): void {
+    this.#cache.set(ident, { flight, addedAt: Date.now() });
+    console.log(`${ident} stored in cache`);
+  }
+
+  private cacheRemoveExpired(): void {
+    for (let [k, v] of this.#cache.entries()) {
+      if (this.expired(v.addedAt)) {
+        this.#cache.delete(k);
+        console.log(`${k} removed since expired`);
+      }
+    }
+  }
+
+  private expired(addedAt: number): boolean {
+    return Date.now() - addedAt > DetailsAPI.#CACHE_RECORD_TTL_MINS * 60 * 1000;
   }
 }
 

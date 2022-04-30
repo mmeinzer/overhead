@@ -10,16 +10,9 @@ export type Aircraft = {
 export function bufferToLocations(buffer: ArrayBuffer): Aircraft[] {
   let vals = new Uint32Array(buffer, 0, 8);
 
-  const time = vals[0];
-  const timeAlt = vals[1];
-  const stride = vals[2];
-
+  const [time, timeAlt, stride] = vals;
   if (!time || !timeAlt || !stride) {
-    throw new Error("Value is undefined");
-  }
-
-  if (!stride) {
-    throw new Error("Missing stride");
+    throw new Error("time, timeAlt, or stride is missing");
   }
 
   const aircrafts = [];
