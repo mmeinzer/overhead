@@ -2,13 +2,16 @@ import { Aircraft } from "./convert";
 import { isCoordInBox } from "./coordinate";
 import { DetailsAPI } from "./details";
 import { PositionUpdater } from "./position";
+import { createServer } from "./server";
 
 async function main() {
   const updater = new PositionUpdater();
-  updater.onUpdate(logIfAnyInBox);
-
   const detailsAPI = new DetailsAPI();
-  async function logIfAnyInBox(locations: Aircraft[]): Promise<void> {
+  const startServer = createServer();
+
+  updater.onUpdate(logFirstFoundInBox);
+
+  async function logFirstFoundInBox(locations: Aircraft[]): Promise<void> {
     const result = locations.find((aircraftData) => {
       return isCoordInBox(
         [
@@ -20,15 +23,15 @@ async function main() {
     });
 
     if (!result?.flight) {
-      console.log("No flights in area. Skipping details lookup.");
+      console.log("No flights in box. Skipping details lookup.");
       return;
     }
 
     const info = await detailsAPI.lookup(result.flight);
-
     console.log(info);
   }
 
+  await startServer();
   await updater.start();
 }
 
