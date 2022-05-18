@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { render, Box, Text } from "ink";
-import { Aircraft } from "../convert";
-import { PositionUpdater } from "../position";
+import { Aircraft } from "../flights/convert";
+import { PositionUpdater } from "../flights/position";
 import { Coordinate, isCoordInBox } from "../coordinate";
 
 const vergeBox: [Coordinate, Coordinate] = [
