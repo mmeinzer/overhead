@@ -13,7 +13,8 @@ export function createServer() {
   // └── your plugins (your custom plugins)
   // └── decorators
   // └── hooks
-  // └── your services
+  // └── your services (routes)
+
   fastify.register(traps);
   fastify.register(fp(decorateFastifyInstance));
   fastify.register(routes);
