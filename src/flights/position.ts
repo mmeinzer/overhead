@@ -1,4 +1,4 @@
-import got, { Got, Response } from "got";
+import got, { Got, Response, Options, Headers } from "got";
 import { EventEmitter } from "stream";
 import { bufferToLocations, Aircraft } from "./convert";
 
@@ -14,17 +14,14 @@ export class PositionUpdater {
 
   #cookie: string;
   #returnedRateLimitMs: number = 2000;
-  #intervalId: NodeJS.Timer | null = null;
+  #intervalId: NodeJS.Timer | null = null; // TODO: can be used to implement a stop function
   #airplanes: Aircraft[] = [];
 
   constructor() {
     this.#cookie = PositionUpdater.generateCookie();
     this.#client = got.extend({
       prefixUrl: PositionUpdater.#API_BASE,
-      headers: {
-        referer: `${PositionUpdater.#API_BASE}/`,
-        cookie: this.#cookie,
-      },
+      headers: this.clientHeaders(),
       retry: 0,
     });
   }
@@ -42,15 +39,19 @@ export class PositionUpdater {
     );
   }
 
-  stop(): void {
-    if (!this.#intervalId) {
-      return;
+  /**
+   * Attempts to reset the cookie in order to recover from failing ADS-B exchange API requests
+   */
+  private async resetAndActivateClientCookie(): Promise<void> {
+    this.#cookie = PositionUpdater.generateCookie();
+    const options: Options = {
+      headers: this.clientHeaders(),
+    };
+    this.#client.mergeOptions(options);
+    const rateLimit = await this.activateCookieViaRateLimitEndpoint();
+    if (rateLimit === null) {
+      console.error("Failed to activate new cookie");
     }
-
-    clearInterval(this.#intervalId);
-    this.#intervalId = null;
-
-    this.#emitter.removeAllListeners();
   }
 
   onUpdate(cb: AircraftUpdateHandler): void {
@@ -68,6 +69,13 @@ export class PositionUpdater {
     const cookieVal = `${expiresAtMs}_${randomBytes}`;
 
     return `${PositionUpdater.#COOKIE_NAME}=${cookieVal}`;
+  }
+
+  private clientHeaders(): Headers {
+    return {
+      referer: `${PositionUpdater.#API_BASE}/`,
+      cookie: this.#cookie,
+    };
   }
 
   private async activateCookieViaRateLimitEndpoint(): Promise<number | null> {
@@ -109,8 +117,9 @@ export class PositionUpdater {
   private async updateFlightData(): Promise<void> {
     const data = await this.getBinaryFlightData();
     if (!data) {
-      // TODO: reset the cookie here or something?
-      console.error("Failed to get binary data");
+      console.error("Failed to get binary data. Getting new cookie");
+
+      await this.resetAndActivateClientCookie();
       return;
     }
 
